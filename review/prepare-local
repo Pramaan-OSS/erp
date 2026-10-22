@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Prepare local dependencies only. Never downloads upstream applications at runtime.
+set -euo pipefail
+root="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$root"
+command -v uv >/dev/null
+command -v node >/dev/null
+node -e 'if (Number(process.versions.node.split(".")[0]) < 24) throw new Error("Node 24 or newer is required.")'
+mkdir -p vendor
+if [ ! -d vendor/framework/.git ]; then
+  git init -q vendor/framework
+  git -C vendor/framework remote add origin https://github.com/frappe/frappe.git
+  git -C vendor/framework fetch --depth 1 origin e7ddbac9b5d9601e891dd57f01f4643a14f7f41c
+fi
+git -C vendor/framework checkout --detach e7ddbac9b5d9601e891dd57f01f4643a14f7f41c
+uv venv --python 3.14 .venv
+uv pip install --python .venv/bin/python -r review/runtime-lock.txt
+uv pip install --python .venv/bin/python -r review/app-requirements.txt
+uv pip install --python .venv/bin/python --no-deps -e vendor/framework -e .
+# The framework pin predates frappe.utils.logging; ship the small shim.
+cp review/framework-shims/frappe/utils/logging.py vendor/framework/frappe/utils/logging.py
+.venv/bin/python scripts/patch-framework.py
+npm install --prefix vendor/framework --no-audit --no-fund
+mkdir -p .runtime/socket
+cp scripts/socket/package.json scripts/socket/package-lock.json .runtime/socket/
+npm --prefix .runtime/socket ci --no-audit --no-fund
+npm --prefix banking install --no-audit --no-fund
+npm --prefix banking run build
+npm install --no-audit --no-fund
+mkdir -p erpnext/public/fonts
+for font in fraunces geist-sans geist-mono; do
+  rm -rf "erpnext/public/fonts/$font"
+  cp -r "node_modules/@fontsource/$font" "erpnext/public/fonts/$font"
+done

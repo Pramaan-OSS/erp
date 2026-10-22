@@ -1,0 +1,79 @@
+{
+ "actions": [],
+ "creation": "2026-10-16 09:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "automatic_sync",
+  "column_break_1",
+  "default_country",
+  "help_section",
+  "help"
+ ],
+ "fields": [
+  {
+   "default": "0",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval: doc.enabled",
+   "fieldname": "automatic_sync",
+   "fieldtype": "Check",
+   "label": "Automatic Synchronization"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval: doc.enabled",
+   "description": "Two-letter bank country code used when a connection starts without one.",
+   "fieldname": "default_country",
+   "fieldtype": "Data",
+   "label": "Default Bank Country",
+   "length": 2
+  },
+  {
+   "fieldname": "help_section",
+   "fieldtype": "Section Break",
+   "label": "How It Works"
+  },
+  {
+   "fieldname": "help",
+   "fieldtype": "HTML",
+   "label": "Help",
+   "options": "<p>Bank feeds are read through the app's own service connection, keyed by PRAMAAN_API_KEY in .env. No bank credentials are stored here.</p><p>Connect a bank to receive transactions into Bank Transactions for reconciliation. Until the service is available for your account, connecting shows a plain message.</p>"
+  }
+ ],
+ "icon": "bank",
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-10-16 09:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ERP Integrations",
+ "name": "Banking Connection Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

@@ -1,0 +1,11 @@
+Unidecode~=1.4.0
+barcodenumber~=0.5.0
+rapidfuzz~=3.14.3
+holidays~=0.87
+pypng~=0.20220715.0
+mt-940>=4.26.0
+pdfplumber>=0.11.0
+google-api-python-client~=2.197.0
+google-auth-oauthlib~=1.4.0
+google-auth~=2.53.0
+pramaan==0.1.0

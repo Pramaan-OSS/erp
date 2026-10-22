@@ -1,0 +1,27 @@
+{
+  "name": "erpnext",
+  "description": "Open Source ERP System powered by the Frappe Framework",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/frappe/erpnext.git"
+  },
+  "homepage": "",
+  "author": "Pramaan OSS",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/frappe/erpnext/issues"
+  },
+  "scripts": {
+    "postinstall": "cd banking && yarn install",
+    "dev": "cd banking && yarn dev",
+    "build": "cd banking && yarn build",
+    "test:js": "node --test \"erpnext/tests/js/**/*.test.mjs\""
+  },
+  "dependencies": {
+    "@fontsource/fraunces": "^5.2.5",
+    "@fontsource/geist-mono": "^5.2.5",
+    "@fontsource/geist-sans": "^5.2.5",
+    "onscan.js": "^1.5.2",
+    "playwright": "^1.55.0"
+  }
+}

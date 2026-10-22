@@ -1,0 +1,84 @@
+{
+ "doctype": "DocType",
+ "name": "Pramaan Outbox",
+ "module": "ERP Integrations",
+ "autoname": "hash",
+ "field_order": [
+  "capability",
+  "payload",
+  "idempotency_key",
+  "state",
+  "communication",
+  "requested_by",
+  "message_id",
+  "result_ref",
+  "error",
+  "trackable"
+ ],
+ "fields": [
+  {
+   "fieldname": "capability",
+   "fieldtype": "Data",
+   "label": "Capability"
+  },
+  {
+   "fieldname": "payload",
+   "fieldtype": "Code",
+   "label": "Payload",
+   "options": "JSON"
+  },
+  {
+   "fieldname": "idempotency_key",
+   "fieldtype": "Data",
+   "label": "Idempotency Key"
+  },
+  {
+   "fieldname": "state",
+   "fieldtype": "Select",
+   "label": "State",
+   "options": "Pending\nSending\nAccepted\nFailed\nUncertain",
+   "default": "Pending"
+  },
+  {
+   "fieldname": "communication",
+   "fieldtype": "Link",
+   "label": "Communication",
+   "options": "Communication"
+  },
+  {
+   "fieldname": "requested_by",
+   "fieldtype": "Link",
+   "label": "Requested By",
+   "options": "User"
+  },
+  {
+   "fieldname": "message_id",
+   "fieldtype": "Data",
+   "label": "Message Id"
+  },
+  {
+   "fieldname": "result_ref",
+   "fieldtype": "Data",
+   "label": "Result Ref"
+  },
+  {
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Error"
+  },
+  {
+   "fieldname": "trackable",
+   "fieldtype": "Check",
+   "label": "Delivery tracking available",
+   "default": "0",
+   "hidden": 1
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1
+  }
+ ],
+ "track_changes": 1
+}

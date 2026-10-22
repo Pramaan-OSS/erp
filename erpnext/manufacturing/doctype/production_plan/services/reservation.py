@@ -1,0 +1,223 @@
+# Copyright (c) 2017, Frappe Technologies Pvt. Ltd. and contributors
+# For license information, please see license.txt
+
+"""Stock reservation for Production Plan (extracted from production_plan.py)."""
+
+from collections import defaultdict
+
+import frappe
+from frappe import _
+from frappe.model.document import Document
+from frappe.query_builder.functions import IfNull, Sum
+from frappe.utils import flt, parse_json
+
+from erpnext.deprecation_dumpster import deprecated
+from erpnext.stock.doctype.stock_reservation_entry.stock_reservation_entry import StockReservation
+
+_RESERVATION_TABLES = {
+	"sub_assembly_items": {
+		"table_name": "sub_assembly_items",
+		"qty_field": "required_qty",
+		"warehouse_field": "fg_warehouse",
+	},
+	"mr_items": {
+		"table_name": "mr_items",
+		"qty_field": "required_bom_qty",
+		"warehouse_field": "warehouse",
+	},
+}
+
+
+def get_reserved_qty_for_production_plan(item_code, warehouse):
+	plan_reservations = _get_plan_reservations(item_code)
+	if not plan_reservations:
+		return None
+
+	work_order_reservations = _get_work_order_reservations(item_code, list(plan_reservations))
+	reserved_qty = 0.0
+	for plan, plan_qty_by_warehouse in plan_reservations.items():
+		reserved_qty += _get_remaining_reserved_qty(
+			plan_qty_by_warehouse, work_order_reservations.get(plan, {}), warehouse
+		)
+
+	return reserved_qty
+
+
+def _get_remaining_reserved_qty(plan_qty_by_warehouse, work_order_qty_by_warehouse, warehouse):
+	remaining_qty_by_warehouse = {
+		plan_warehouse: max(qty - work_order_qty_by_warehouse.get(plan_warehouse, 0.0), 0.0)
+		for plan_warehouse, qty in plan_qty_by_warehouse.items()
+	}
+	total_remaining_qty = sum(remaining_qty_by_warehouse.values())
+	if not total_remaining_qty:
+		return 0.0
+
+	matched_qty = sum(plan_qty_by_warehouse.values()) - total_remaining_qty
+	unmatched_qty = min(sum(work_order_qty_by_warehouse.values()) - matched_qty, total_remaining_qty)
+	remaining_qty = remaining_qty_by_warehouse.get(warehouse, 0.0)
+	return remaining_qty - remaining_qty * unmatched_qty / total_remaining_qty
+
+
+def _get_plan_reservations(item_code):
+	return _group_by_plan_and_warehouse(
+		_get_material_request_plan_query(item_code), _get_sub_assembly_plan_query(item_code)
+	)
+
+
+def _get_material_request_plan_query(item_code):
+	table = frappe.qb.DocType("Production Plan")
+	child = frappe.qb.DocType("Material Request Plan Item")
+	return (
+		frappe.qb.from_(table)
+		.inner_join(child)
+		.on(table.name == child.parent)
+		.select(
+			table.name.as_("production_plan"),
+			child.warehouse,
+			Sum(child.required_bom_qty).as_("reserved_qty"),
+		)
+		.where(_is_open_plan(table) & (child.item_code == item_code))
+		.groupby(table.name, child.warehouse)
+	)
+
+
+def _get_sub_assembly_plan_query(item_code):
+	table = frappe.qb.DocType("Production Plan")
+	child = frappe.qb.DocType("Production Plan Sub Assembly Item")
+	return (
+		frappe.qb.from_(table)
+		.inner_join(child)
+		.on(table.name == child.parent)
+		.select(
+			table.name.as_("production_plan"),
+			child.fg_warehouse.as_("warehouse"),
+			Sum(child.required_qty).as_("reserved_qty"),
+		)
+		.where(
+			_is_open_plan(table)
+			& (child.production_item == item_code)
+			& (child.type_of_manufacturing == "In House")
+		)
+		.groupby(table.name, child.fg_warehouse)
+	)
+
+
+def _is_open_plan(table):
+	return (table.docstatus == 1) & table.status.notin(["Completed", "Closed"])
+
+
+def _get_work_order_reservations(item_code, plan_names):
+	work_order = frappe.qb.DocType("Work Order")
+	work_order_item = frappe.qb.DocType("Work Order Item")
+	query = (
+		frappe.qb.from_(work_order)
+		.from_(work_order_item)
+		.select(
+			work_order.production_plan,
+			work_order_item.source_warehouse.as_("warehouse"),
+			Sum(work_order_item.required_qty).as_("reserved_qty"),
+		)
+		.where(
+			(work_order_item.item_code == item_code)
+			& (work_order_item.parent == work_order.name)
+			& (work_order.docstatus == 1)
+			& (IfNull(work_order_item.source_warehouse, "") != "")
+			& work_order.production_plan.isin(plan_names)
+		)
+		.groupby(work_order.production_plan, work_order_item.source_warehouse)
+	)
+	return _group_by_plan_and_warehouse(query)
+
+
+def _group_by_plan_and_warehouse(*queries):
+	reservations = defaultdict(lambda: defaultdict(float))
+	for query in queries:
+		for row in query.run(as_dict=True):
+			reservations[row.production_plan][row.warehouse] += flt(row.reserved_qty)
+	return reservations
+
+
+@deprecated(
+	f"{__name__}.get_reserved_qty_for_sub_assembly",
+	"2026-10-07",
+	"v18",
+	"Use get_reserved_qty_for_production_plan, which also counts sub-assembly items.",
+)
+def get_reserved_qty_for_sub_assembly(item_code, warehouse):
+	return get_reserved_qty_for_production_plan(item_code, warehouse)
+
+
+class ProductionPlanStockReservation:
+	"""Reservation lifecycle for a Production Plan.
+
+	A Production Plan reserves stock for two of its child tables: the sub-assembly
+	items it will manufacture and the raw materials of its material-request rows
+	(see ``_RESERVATION_TABLES``). On submit the rows are reserved; on cancel the
+	reservations are released.
+
+	The reserved-qty *query* helpers in this module
+	(``get_reserved_qty_for_production_plan`` etc.) are read-only and answer "how
+	much is reserved?" for bins and reports, so they stay module-level functions
+	rather than methods, mirroring the engine's own query helpers.
+	"""
+
+	def __init__(self, doc):
+		self.doc = doc
+
+	def reserve(self, items: str | list | None = None, table_name: str | None = None, notify: bool = False):
+		"""Reserve (docstatus 1) or release (docstatus 2) stock for the plan's tables."""
+		if items and isinstance(items, str):
+			items = parse_json(items)
+
+		for child_table_name, kwargs in _RESERVATION_TABLES.items():
+			if table_name and table_name != child_table_name:
+				continue
+			self._reserve_or_cancel_plan_table(items, kwargs)
+
+		self.doc.reload()
+
+	def _reserve_or_cancel_plan_table(self, items, kwargs):
+		sre = StockReservation(self.doc, items=items, kwargs=kwargs)
+		if self.doc.docstatus == 1:
+			if sre.make_stock_reservation_entries():
+				frappe.msgprint(_("Stock Reservation Entries Created"), alert=True)
+		elif self.doc.docstatus == 2:
+			sre.cancel_stock_reservation_entries()
+
+	def cancel(self, sre_list: str | list | None = None):
+		"""Cancel specific (or all) Stock Reservation Entries held by the plan."""
+		StockReservation(self.doc).cancel_stock_reservation_entries(sre_list)
+		self.doc.reload()
+
+
+@frappe.whitelist()
+def make_stock_reservation_entries(
+	doc: str | Document, items: str | list | None = None, table_name: str | None = None, notify: bool = False
+):
+	"""Whitelisted entry point: verify Production Plan write access, then reserve stock."""
+	doc = _load_production_plan(doc)
+	frappe.has_permission("Production Plan", "write", doc=doc, throw=True)
+	ProductionPlanStockReservation(doc).reserve(items=items, table_name=table_name, notify=notify)
+
+
+def reserve_stock_for_production_plan(
+	doc: Document, items: str | list | None = None, table_name: str | None = None, notify: bool = False
+):
+	"""Reserve stock for a Production Plan. Internal: no permission check (also called
+	from the Production Plan submit/cancel lifecycle)."""
+	ProductionPlanStockReservation(doc).reserve(items=items, table_name=table_name, notify=notify)
+
+
+@frappe.whitelist()
+def cancel_stock_reservation_entries(doc: str | Document, sre_list: str | list):
+	"""Whitelisted entry point: verify Production Plan write access, then cancel reservations."""
+	doc = _load_production_plan(doc)
+	frappe.has_permission("Production Plan", "write", doc=doc, throw=True)
+	ProductionPlanStockReservation(doc).cancel(sre_list)
+
+
+def _load_production_plan(doc: str | dict | Document) -> Document:
+	if isinstance(doc, str | dict):
+		doc = parse_json(doc)
+		doc = frappe.get_doc("Production Plan", doc.get("name"))
+	return doc

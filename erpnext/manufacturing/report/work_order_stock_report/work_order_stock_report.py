@@ -1,0 +1,184 @@
+# Copyright (c) 2017, Velometro Mobility Inc and contributors
+# For license information, please see license.txt
+
+
+import frappe
+from frappe import _
+from frappe.query_builder.functions import IfNull, Max, Sum
+from frappe.utils import cint
+
+from erpnext.stock.doctype.company_restriction.company_restriction import get_allowed_companies_condition
+
+
+def execute(filters=None):
+	wo_list = get_work_orders()
+	data = get_item_list(wo_list, filters)
+	columns = get_columns()
+	return columns, data
+
+
+def get_item_list(wo_list, filters):
+	out = []
+
+	if wo_list:
+		bin = frappe.qb.DocType("Bin")
+		bom = frappe.qb.DocType("BOM")
+		bom_item = frappe.qb.DocType("BOM Item")
+
+		# Add a row for each item/qty
+		for wo_details in wo_list:
+			desc = frappe.db.get_value("BOM", wo_details.bom_no, "description")
+
+			for wo_item_details in frappe.db.get_values(
+				"Work Order Item", {"parent": wo_details.name}, ["item_code", "source_warehouse"], as_dict=1
+			):
+				item_list = (
+					frappe.qb.from_(bom)
+					.from_(bom_item)
+					.left_join(bin)
+					.on(
+						(bom_item.item_code == bin.item_code)
+						& (bin.warehouse == IfNull(wo_item_details.source_warehouse, filters.warehouse))
+					)
+					.select(
+						bom_item.item_code.as_("item_code"),
+						# Aggregate so the query stays one row per item_code and is Postgres
+						# GROUP-BY-valid. A BOM may list the same item on several lines; adding the
+						# qty columns to GROUP BY would split the row and change the row count on
+						# MariaDB. actual_qty (single warehouse) and bom.quantity (single BOM) are
+						# pinned to one value, so Max() returns that value; the per-unit requirement
+						# is the TOTAL of this item across its lines, so stock_qty is summed. For the
+						# common single-line item this equals the prior expression exactly.
+						IfNull(Max(bin.actual_qty) * Max(bom.quantity) / Sum(bom_item.stock_qty), 0).as_(
+							"build_qty"
+						),
+					)
+					.where(
+						(bom.name == bom_item.parent)
+						& (bom_item.item_code == wo_item_details.item_code)
+						& (bom.name == wo_details.bom_no)
+					)
+					.groupby(bom_item.item_code)
+				).run(as_dict=1)
+
+				stock_qty = 0
+				count = 0
+				buildable_qty = wo_details.qty
+				for item in item_list:
+					count = count + 1
+					if item.build_qty >= (wo_details.qty - wo_details.produced_qty):
+						stock_qty = stock_qty + 1
+					elif buildable_qty >= item.build_qty:
+						buildable_qty = item.build_qty
+
+				if count == stock_qty:
+					build = "Y"
+				else:
+					build = "N"
+
+				row = frappe._dict(
+					{
+						"work_order": wo_details.name,
+						"status": wo_details.status,
+						"req_items": cint(count),
+						"instock": stock_qty,
+						"description": desc,
+						"source_warehouse": wo_item_details.source_warehouse,
+						"item_code": wo_item_details.item_code,
+						"bom_no": wo_details.bom_no,
+						"qty": wo_details.qty,
+						"buildable_qty": buildable_qty,
+						"ready_to_build": build,
+					}
+				)
+
+				out.append(row)
+
+	return out
+
+
+def get_work_orders():
+	work_order_filters = [{"docstatus": 1, "status": ("!=", "Completed")}]
+	if condition := get_allowed_companies_condition(frappe.qb.DocType("Work Order").company, "Work Order"):
+		work_order_filters.append(condition)
+
+	out = frappe.get_all(
+		"Work Order",
+		filters=work_order_filters,
+		fields=["name", "status", "bom_no", "qty", "produced_qty"],
+		order_by="name",
+	)
+
+	return out
+
+
+def get_columns():
+	columns = [
+		{
+			"fieldname": "work_order",
+			"label": _("Work Order"),
+			"fieldtype": "Link",
+			"options": "Work Order",
+			"width": 110,
+		},
+		{"fieldname": "bom_no", "label": _("BOM"), "fieldtype": "Link", "options": "BOM", "width": 120},
+		{
+			"fieldname": "description",
+			"label": _("Description"),
+			"fieldtype": "Data",
+			"options": "",
+			"width": 230,
+		},
+		{
+			"fieldname": "item_code",
+			"label": _("Item Code"),
+			"fieldtype": "Link",
+			"options": "Item",
+			"width": 110,
+		},
+		{
+			"fieldname": "source_warehouse",
+			"label": _("Source Warehouse"),
+			"fieldtype": "Link",
+			"options": "Warehouse",
+			"width": 110,
+		},
+		{
+			"fieldname": "qty",
+			"label": _("Qty to Build"),
+			"fieldtype": "Data",
+			"options": "",
+			"width": 110,
+		},
+		{"fieldname": "status", "label": _("Status"), "fieldtype": "Data", "options": "", "width": 100},
+		{
+			"fieldname": "req_items",
+			"label": _("# Req'd Items"),
+			"fieldtype": "Data",
+			"options": "",
+			"width": 105,
+		},
+		{
+			"fieldname": "instock",
+			"label": _("# In Stock"),
+			"fieldtype": "Data",
+			"options": "",
+			"width": 105,
+		},
+		{
+			"fieldname": "buildable_qty",
+			"label": _("Buildable Qty"),
+			"fieldtype": "Data",
+			"options": "",
+			"width": 100,
+		},
+		{
+			"fieldname": "ready_to_build",
+			"label": _("Build All?"),
+			"fieldtype": "Data",
+			"options": "",
+			"width": 90,
+		},
+	]
+
+	return columns

@@ -1,0 +1,62 @@
+{% extends "templates/web.html" %}
+
+{% block title %}{{ _("Sign in") }}{% endblock %}
+
+{% block page_content %}
+<div class="erp-login-card" role="main">
+	<span class="wordmark">ERP<i aria-hidden="true"></i></span>
+	<h1>{{ _("Sign in") }}</h1>
+
+	{% if social_reason %}
+	<p class="erp-meta">{{ social_reason }}</p>
+	{% endif %}
+
+	<form id="erp-login-form" method="post" action="/api/method/login">
+		<label>
+			{{ _("Email or username") }}
+			<input type="text" name="usr" id="erp-login-usr" autocomplete="username" required>
+		</label>
+		<label>
+			{{ _("Password") }}
+			<input type="password" name="pwd" id="erp-login-pwd" autocomplete="current-password" required>
+		</label>
+		<p class="erp-note" id="erp-login-note" hidden></p>
+		<button type="submit" class="erp-btn erp-btn-ink">{{ _("Sign in") }}</button>
+	</form>
+
+	{% if social_enabled %}
+	<hr class="erp-rule">
+	<a class="erp-btn erp-btn-quiet" href="/api/method/erpnext.erp_integrations.pramaan.signing.start_redirect">
+		{{ _("Continue with your sign-in account") }}
+	</a>
+	<p class="erp-meta">{{ _("The sign-in page of your account opens. You come back here.") }}</p>
+	{% endif %}
+</div>
+
+<script>
+	document.getElementById("erp-login-form").addEventListener("submit", function (event) {
+		event.preventDefault();
+		var note = document.getElementById("erp-login-note");
+		var form = event.target;
+		var button = form.querySelector("button[type=submit]");
+		button.disabled = true;
+		fetch(form.action, {
+			method: "POST",
+			headers: { "Content-Type": "application/x-www-form-urlencoded" },
+			body: new URLSearchParams(new FormData(form)).toString(),
+		}).then(function (response) {
+			if (response.ok) {
+				window.location.href = "/app";
+				return;
+			}
+			note.hidden = false;
+			note.textContent = "{{ _("That email or password did not match. Try again.") }}";
+			button.disabled = false;
+		}).catch(function () {
+			note.hidden = false;
+			note.textContent = "{{ _("Sign-in could not be reached. Try again.") }}";
+			button.disabled = false;
+		});
+	});
+</script>
+{% endblock %}

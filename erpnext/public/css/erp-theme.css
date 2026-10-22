@@ -1,0 +1,327 @@
+/* ERP theme: tokens from the builder DESIGN.md (§4–§7), applied to the desk,
+   the portal and the sign-in page. The only file carrying colour literals. */
+
+@font-face {
+  font-family: "Fraunces";
+  src: url("/assets/erpnext/fonts/fraunces/files/fraunces-latin-400-normal.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist Sans";
+  src: url("/assets/erpnext/fonts/geist-sans/files/geist-sans-latin-400-normal.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist Sans";
+  src: url("/assets/erpnext/fonts/geist-sans/files/geist-sans-latin-500-normal.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/assets/erpnext/fonts/geist-mono/files/geist-mono-latin-400-normal.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --erp-bg: #ededed;
+  --erp-glass: rgba(255, 255, 255, 0.58);
+  --erp-glass-strong: rgba(255, 255, 255, 0.82);
+  --erp-glass-edge: rgba(255, 255, 255, 0.9);
+  --erp-card-edge: rgba(0, 0, 0, 0.07);
+  --erp-card-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 1px 2px rgba(0, 0, 0, 0.04);
+  --erp-surface-sunk: rgba(0, 0, 0, 0.035);
+  --erp-line: rgba(0, 0, 0, 0.08);
+  --erp-line-soft: rgba(0, 0, 0, 0.05);
+  --erp-fg: #111111;
+  --erp-fg-2: #454545;
+  --erp-fg-3: #5f5f5f;
+  --erp-inverse: rgba(17, 17, 17, 0.88);
+  --erp-on-inverse: #ffffff;
+  --erp-thread: rgba(43, 89, 209, 0.88);
+  --erp-thread-solid: #2b59d1;
+  --erp-on-thread: #ffffff;
+  --erp-focus: #2b59d1;
+  --erp-serif: "Fraunces", Georgia, "Times New Roman", serif;
+  --erp-sans: "Geist Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --erp-mono: "Geist Mono", ui-monospace, Menlo, Consolas, monospace;
+  --erp-r-island: 24px;
+  --erp-r-card: 16px;
+  --erp-r-ctl: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --erp-bg: #0f0f10;
+    --erp-glass: rgba(255, 255, 255, 0.05);
+    --erp-glass-strong: rgba(255, 255, 255, 0.085);
+    --erp-glass-edge: rgba(255, 255, 255, 0.13);
+    --erp-card-edge: rgba(255, 255, 255, 0.1);
+    --erp-card-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset, 0 1px 2px rgba(0, 0, 0, 0.3);
+    --erp-surface-sunk: rgba(255, 255, 255, 0.03);
+    --erp-line: rgba(255, 255, 255, 0.11);
+    --erp-line-soft: rgba(255, 255, 255, 0.07);
+    --erp-fg: #f4f4f4;
+    --erp-fg-2: #c6c6c6;
+    --erp-fg-3: #9a9a9a;
+    --erp-inverse: rgba(244, 244, 244, 0.9);
+    --erp-on-inverse: #111111;
+    --erp-thread: rgba(107, 147, 240, 0.9);
+    --erp-thread-solid: #6b93f0;
+    --erp-on-thread: #0b1430;
+    --erp-focus: #6b93f0;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --erp-bg: #0f0f10;
+  --erp-glass: rgba(255, 255, 255, 0.05);
+  --erp-glass-strong: rgba(255, 255, 255, 0.085);
+  --erp-glass-edge: rgba(255, 255, 255, 0.13);
+  --erp-card-edge: rgba(255, 255, 255, 0.1);
+  --erp-card-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset, 0 1px 2px rgba(0, 0, 0, 0.3);
+  --erp-surface-sunk: rgba(255, 255, 255, 0.03);
+  --erp-line: rgba(255, 255, 255, 0.11);
+  --erp-line-soft: rgba(255, 255, 255, 0.07);
+  --erp-fg: #f4f4f4;
+  --erp-fg-2: #c6c6c6;
+  --erp-fg-3: #9a9a9a;
+  --erp-inverse: rgba(244, 244, 244, 0.9);
+  --erp-on-inverse: #111111;
+  --erp-thread: rgba(107, 147, 240, 0.9);
+  --erp-thread-solid: #6b93f0;
+  --erp-on-thread: #0b1430;
+  --erp-focus: #6b93f0;
+  color-scheme: dark;
+}
+
+/* Desk mapping: the framework reads these variables. */
+:root,
+.workspace-theme-light,
+[data-theme="light"] {
+  --bg-color: var(--erp-bg);
+  --card-bg: var(--erp-glass);
+  --control-bg: var(--erp-glass-strong);
+  --text-color: var(--erp-fg);
+  --text-muted: var(--erp-fg-3);
+  --heading-font: var(--erp-serif);
+  --font-stack: var(--erp-sans);
+  --mono-font: var(--erp-mono);
+  --primary-color: var(--erp-thread-solid);
+  --primary-color-hover: var(--erp-thread);
+  --btn-primary-bg: var(--erp-thread);
+  --btn-primary-hover-bg: var(--erp-thread-solid);
+  --btn-primary-color: var(--erp-on-thread);
+  --border-color: var(--erp-line);
+  --border-color-soft: var(--erp-line-soft);
+  --card-shadow: var(--erp-card-shadow);
+  --focus-ring: 2px solid var(--erp-focus);
+}
+
+body {
+  font-family: var(--erp-sans);
+  letter-spacing: 0;
+}
+h1, h2, h3, h4, .page-title, .indicator-pill {
+  font-family: var(--erp-serif);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+code, pre, .code {
+  font-family: var(--erp-mono);
+  font-size: 12px;
+}
+
+.btn,
+button.btn,
+.btn-primary,
+.btn-secondary,
+.btn-default {
+  border-radius: 9999px;
+  font-weight: 500;
+  font-size: 13px;
+  transition: 120ms;
+}
+.btn:focus-visible,
+a:focus-visible,
+.page-container :focus-visible {
+  outline: 2px solid var(--erp-focus);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.form-control,
+select.form-control,
+.input-with-feedback {
+  border-radius: var(--erp-r-ctl);
+  border-color: var(--erp-line);
+  background: var(--erp-glass-strong);
+}
+.form-control:focus {
+  border-color: var(--erp-fg);
+  box-shadow: none;
+}
+.card,
+.widget,
+.form-card,
+.page-card {
+  border-radius: var(--erp-r-card);
+  border-color: var(--erp-card-edge);
+  box-shadow: var(--erp-card-shadow);
+}
+
+/* Portal and sign-in surfaces. */
+.web-footer, .from-body-overwritten {
+  border-color: var(--erp-line-soft);
+}
+.page-card, .login-card {
+  background: var(--erp-glass);
+  border: 1px solid var(--erp-card-edge);
+}
+
+/* Sign-in page built on the design tokens. */
+.erp-login-body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  background: var(--erp-bg);
+  font-family: var(--erp-sans);
+  color: var(--erp-fg);
+}
+.erp-login-body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(900px 520px at 85% -10%, rgba(20, 20, 20, 0.14), transparent 65%),
+    radial-gradient(700px 500px at -10% 110%, rgba(20, 20, 20, 0.14), transparent 65%),
+    radial-gradient(600px 400px at 35% 40%, rgba(255, 255, 255, 0.9), transparent 70%);
+}
+@media (prefers-color-scheme: dark) {
+  .erp-login-body:not([data-theme="light"])::before {
+    background:
+      radial-gradient(900px 520px at 85% -10%, rgba(0, 0, 0, 0.6), transparent 65%),
+      radial-gradient(700px 500px at -10% 110%, rgba(0, 0, 0, 0.6), transparent 65%),
+      radial-gradient(600px 400px at 35% 40%, rgba(255, 255, 255, 0.09), transparent 70%);
+  }
+}
+.erp-login-card {
+  width: min(400px, 92vw);
+  background: var(--erp-glass);
+  backdrop-filter: blur(20px) saturate(1.1);
+  border: 1px solid var(--erp-glass-edge);
+  box-shadow: var(--erp-card-shadow);
+  border-radius: var(--erp-r-island);
+  padding: 28px 24px;
+  display: grid;
+  gap: 16px;
+}
+.erp-login-card .wordmark {
+  font-family: var(--erp-serif);
+  font-size: 21px;
+  font-weight: 400;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.erp-login-card .wordmark i {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--erp-inverse);
+  display: inline-block;
+}
+.erp-login-card h1 {
+  font-family: var(--erp-serif);
+  font-size: 28px;
+  font-weight: 400;
+  line-height: 1.2;
+  margin: 0;
+}
+.erp-login-card p.erp-meta {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--erp-fg-3);
+  margin: 0;
+}
+.erp-login-card label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--erp-fg-2);
+}
+.erp-login-card input {
+  height: 38px;
+  padding: 0 12px;
+  font-size: 14px;
+  font-family: var(--erp-sans);
+  color: var(--erp-fg);
+  background: var(--erp-glass-strong);
+  border: 1px solid var(--erp-line);
+  border-radius: var(--erp-r-ctl);
+}
+.erp-login-card input:focus {
+  outline: none;
+  border-color: var(--erp-fg);
+}
+.erp-login-card input:focus-visible {
+  outline: 2px solid var(--erp-focus);
+  outline-offset: 2px;
+}
+.erp-login-card .erp-btn {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--erp-sans);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: 120ms;
+}
+.erp-login-card .erp-btn-ink {
+  background: var(--erp-inverse);
+  color: var(--erp-on-inverse);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+.erp-login-card .erp-btn-ink:hover {
+  background: var(--erp-fg);
+}
+.erp-login-card .erp-btn-quiet {
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--erp-fg);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow: var(--erp-card-shadow);
+}
+.erp-login-card .erp-btn-quiet:hover {
+  background: rgba(255, 255, 255, 0.8);
+}
+.erp-login-card .erp-note {
+  font-size: 12px;
+  color: var(--erp-fg-3);
+  line-height: 1.45;
+}
+.erp-login-card .erp-rule {
+  border: 0;
+  border-top: 1px solid var(--erp-line-soft);
+  margin: 4px 0;
+}
+
+/* A closed dialog's fading layer must not intercept the next action. */
+.modal-backdrop:not(.show):not(.in) {
+  pointer-events: none;
+}

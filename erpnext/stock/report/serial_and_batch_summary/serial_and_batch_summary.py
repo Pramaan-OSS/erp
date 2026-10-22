@@ -1,0 +1,254 @@
+# Copyright (c) 2023, Frappe Technologies Pvt. Ltd. and contributors
+# For license information, please see license.txt
+
+from typing import Any
+
+import frappe
+from frappe import _
+
+from erpnext.stock.report.utils import prepare_serial_batch_report
+from erpnext.stock.serial_batch_identity import SerialBatchIdentity
+
+
+def execute(filters=None):
+	data = get_data(filters)
+	columns = get_columns(filters, data)
+
+	return prepare_serial_batch_report(columns, data)
+
+
+def get_data(filters):
+	filter_conditions = get_filter_conditions(filters)
+
+	return frappe.get_all(
+		"Serial and Batch Bundle",
+		fields=[
+			"`tabSerial and Batch Bundle`.`voucher_type`",
+			"`tabSerial and Batch Bundle`.`posting_datetime` as posting_date",
+			"`tabSerial and Batch Bundle`.`name`",
+			"`tabSerial and Batch Bundle`.`company`",
+			"`tabSerial and Batch Bundle`.`voucher_no`",
+			"`tabSerial and Batch Bundle`.`item_code`",
+			"`tabSerial and Batch Bundle`.`item_name`",
+			"`tabSerial and Batch Entry`.`serial_no`",
+			"`tabSerial and Batch Entry`.`batch_no`",
+			"`tabSerial and Batch Entry`.`warehouse`",
+			"`tabSerial and Batch Entry`.`incoming_rate`",
+			"`tabSerial and Batch Entry`.`stock_value_difference`",
+			"`tabSerial and Batch Entry`.`qty`",
+		],
+		filters=filter_conditions,
+		order_by="posting_datetime",
+	)
+
+
+def get_filter_conditions(filters):
+	filter_conditions = [
+		["Serial and Batch Bundle", "docstatus", "=", 1],
+		["Serial and Batch Bundle", "is_cancelled", "=", 0],
+	]
+
+	for field in ["voucher_type", "voucher_no", "item_code", "warehouse", "company"]:
+		if filters.get(field):
+			if field == "voucher_no":
+				filter_conditions.append(["Serial and Batch Bundle", field, "in", filters.get(field)])
+			else:
+				filter_conditions.append(["Serial and Batch Bundle", field, "=", filters.get(field)])
+
+	if filters.get("from_date") and filters.get("to_date"):
+		filter_conditions.append(
+			[
+				"Serial and Batch Bundle",
+				"posting_datetime",
+				"between",
+				[filters.get("from_date"), filters.get("to_date")],
+			]
+		)
+
+	for field in ["serial_no", "batch_no"]:
+		if filters.get(field):
+			filter_conditions.append(["Serial and Batch Entry", field, "=", filters.get(field)])
+
+	return filter_conditions
+
+
+def get_columns(filters, data):
+	columns = [
+		{
+			"label": _("Company"),
+			"fieldname": "company",
+			"fieldtype": "Link",
+			"options": "Company",
+			"width": 120,
+		},
+		{
+			"label": _("Serial and Batch Bundle"),
+			"fieldname": "name",
+			"fieldtype": "Link",
+			"options": "Serial and Batch Bundle",
+			"width": 110,
+		},
+		{"label": _("Posting Date"), "fieldname": "posting_date", "fieldtype": "Date", "width": 100},
+	]
+
+	item_details = {}
+
+	item_codes = []
+	if filters.get("voucher_type"):
+		item_codes = [d.item_code for d in data]
+
+	if filters.get("item_code") or (item_codes and len(list(set(item_codes))) == 1):
+		item_details = frappe.get_cached_value(
+			"Item",
+			filters.get("item_code") or item_codes[0],
+			["has_serial_no", "has_batch_no"],
+			as_dict=True,
+		)
+
+	if not filters.get("voucher_no"):
+		columns.extend(
+			[
+				{
+					"label": _("Voucher Type"),
+					"fieldname": "voucher_type",
+					"fieldtype": "Link",
+					"options": "DocType",
+					"width": 120,
+				},
+				{
+					"label": _("Voucher No"),
+					"fieldname": "voucher_no",
+					"fieldtype": "Dynamic Link",
+					"options": "voucher_type",
+					"width": 160,
+				},
+			]
+		)
+
+	if not filters.get("item_code"):
+		columns.extend(
+			[
+				{
+					"label": _("Item Code"),
+					"fieldname": "item_code",
+					"fieldtype": "Link",
+					"options": "Item",
+					"width": 120,
+				},
+				{"label": _("Item Name"), "fieldname": "item_name", "fieldtype": "Data", "width": 120},
+			]
+		)
+
+	if not filters.get("warehouse"):
+		columns.append(
+			{
+				"label": _("Warehouse"),
+				"fieldname": "warehouse",
+				"fieldtype": "Link",
+				"options": "Warehouse",
+				"width": 120,
+			}
+		)
+
+	if not item_details or item_details.get("has_serial_no"):
+		columns.append(
+			{
+				"label": _("Serial No"),
+				"fieldname": "serial_no",
+				"fieldtype": "Link",
+				"width": 120,
+				"options": "Serial No",
+			}
+		)
+
+	if not item_details or item_details.get("has_batch_no"):
+		columns.extend(
+			[
+				{
+					"label": _("Batch No"),
+					"fieldname": "batch_no",
+					"fieldtype": "Link",
+					"options": "Batch",
+					"width": 120,
+				},
+				{"label": _("Batch Qty"), "fieldname": "qty", "fieldtype": "Float", "width": 120},
+			]
+		)
+
+	columns.extend(
+		[
+			{"label": _("Incoming Rate"), "fieldname": "incoming_rate", "fieldtype": "Float", "width": 120},
+			{
+				"label": _("Change in Stock Value"),
+				"fieldname": "stock_value_difference",
+				"fieldtype": "Float",
+				"width": 120,
+			},
+		]
+	)
+
+	return columns
+
+
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def get_voucher_type(doctype: Any, txt: str, searchfield: Any, start: int, page_len: int, filters: dict):
+	child_doctypes = frappe.get_all(
+		"DocField",
+		filters={"fieldname": "serial_and_batch_bundle"},
+		fields=["parent"],
+		distinct=True,
+	)
+
+	query_filters = {"options": ["in", [d.parent for d in child_doctypes]]}
+	if txt:
+		query_filters["parent"] = ["like", f"%{txt}%"]
+
+	return frappe.get_all("DocField", filters=query_filters, fields=["parent"], as_list=True, distinct=True)
+
+
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def get_serial_nos(doctype: str, txt: str, searchfield: str, start: int, page_len: int, filters: dict):
+	return get_serial_batch_options("Serial No", txt, start, page_len, filters)
+
+
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def get_batch_nos(doctype: str, txt: str, searchfield: str, start: int, page_len: int, filters: dict):
+	return get_serial_batch_options("Batch", txt, start, page_len, filters)
+
+
+def get_serial_batch_options(doctype, txt, start, page_len, filters):
+	if not filters.get("item_code") and not filters.get("voucher_no"):
+		return []
+
+	identity = SerialBatchIdentity(doctype)
+	query = frappe.qb.get_query(
+		doctype,
+		fields=["name", identity.number_field, identity.item_field],
+		filters={identity.item_field: filters["item_code"]} if filters.get("item_code") else {},
+		or_filters={
+			"name": ("like", f"%{txt}%"),
+			identity.number_field: ("like", f"%{txt}%"),
+		},
+		order_by=f"{identity.number_field} asc, name asc",
+		limit=page_len,
+		offset=start,
+	)
+	if filters.get("voucher_no"):
+		bundle_filters = {
+			"voucher_no": ("in", filters["voucher_no"]),
+			"docstatus": 1,
+			"is_cancelled": 0,
+		}
+		if filters.get("voucher_type"):
+			bundle_filters["voucher_type"] = filters["voucher_type"]
+		entry_field = "serial_no" if doctype == "Serial No" else "batch_no"
+		used_ids = frappe.qb.get_query(
+			"Serial and Batch Bundle",
+			fields=[f"entries.{entry_field}"],
+			filters=bundle_filters,
+		)
+		query = query.where(frappe.qb.DocType(doctype).name.isin(used_ids))
+	return query.run(as_list=True)

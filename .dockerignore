@@ -1,0 +1,11 @@
+.git
+.env
+.env.*
+!.env.example
+.scratch
+.runtime
+.venv
+.tools
+node_modules
+__pycache__
+vendor
