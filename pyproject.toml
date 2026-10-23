@@ -8,7 +8,7 @@ requires-python = ">=3.14"
 readme = "README.md"
 dynamic = ["version"]
 dependencies = [
-    "pramaan==0.1.0",
+    "pramaan==0.1.1",
     # Core dependencies
     "Unidecode~=1.4.0",
     "barcodenumber~=0.5.0",

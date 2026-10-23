@@ -1,2 +1,2 @@
-pramaan==0.1.0
+pramaan==0.1.1
 ruff==0.2.0
