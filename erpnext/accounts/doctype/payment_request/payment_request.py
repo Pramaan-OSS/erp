@@ -15,8 +15,8 @@ from erpnext.accounts.doctype.payment_entry.payment_entry import (
 )
 from erpnext.accounts.doctype.subscription_plan.subscription_plan import get_plan_rate
 from erpnext.accounts.party import get_party_account
-from erpnext.erp_integrations.pramaan import get_client
 from erpnext.accounts.utils import get_account_currency, get_advance_payment_doctypes, get_currency_precision
+from erpnext.erp_integrations.pramaan import get_client
 
 ALLOWED_DOCTYPES_FOR_PAYMENT_REQUEST = [
 	"Sales Order",

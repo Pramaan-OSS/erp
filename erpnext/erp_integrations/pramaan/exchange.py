@@ -23,17 +23,17 @@ def dated_rate_request(from_currency: str, to_currency: str, transaction_date: s
 
 def rate_from_latest(result: dict) -> float:
 	rate = result.get("rate")
-	if isinstance(rate, (int, float)) and rate > 0:
+	if isinstance(rate, int | float) and rate > 0:
 		return float(rate)
 	inverse = result.get("inverseRate")
-	if isinstance(inverse, (int, float)) and inverse > 0:
+	if isinstance(inverse, int | float) and inverse > 0:
 		return 1.0 / float(inverse)
 	raise ValueError("The exchange-rate reply holds no usable rate.")
 
 
 def rate_from_history(result: dict, transaction_date: str) -> float:
 	"""Pick the rate of the requested day, else the latest day in the range."""
-	rows = [row for row in result.get("rates") or [] if isinstance(row.get("rate"), (int, float))]
+	rows = [row for row in result.get("rates") or [] if isinstance(row.get("rate"), int | float)]
 	if not rows:
 		raise ValueError("The exchange-rate reply holds no usable rate.")
 	date = str(transaction_date)[:10]

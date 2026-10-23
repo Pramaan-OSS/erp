@@ -1,14 +1,13 @@
 """All outside service calls go through this server-side module."""
-from dataclasses import dataclass
-from typing import Literal
 import json
 import os
 import time
 import uuid
-from urllib.parse import quote, urlparse
-from urllib.request import Request, build_opener, HTTPRedirectHandler
+from dataclasses import dataclass
+from typing import ClassVar, Literal
 from urllib.error import HTTPError, URLError
-
+from urllib.parse import quote, urlparse
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 Feature = Literal[
     "email_sending", "social_sign_in", "bank_feeds", "routing", "sms",
@@ -418,7 +417,7 @@ class PramaanClient:
 
     # Feature contracts each stay false until their integration and fake
     # checks are in place; live platform status decides the rest.
-    FEATURES = {
+    FEATURES: ClassVar[dict[str, bool]] = {
         "email_sending": True,
         "social_sign_in": True,
         "bank_feeds": False,

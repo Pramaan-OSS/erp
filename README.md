@@ -1,3 +1,5 @@
+[![CI](https://github.com/Pramaan-OSS/erp/actions/workflows/ci.yml/badge.svg)](https://github.com/Pramaan-OSS/erp/actions/workflows/ci.yml)
+
 # ERP
 
 A complete, open-source ERP: accounting, orders, stock, manufacturing, buying,

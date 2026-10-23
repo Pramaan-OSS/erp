@@ -8,8 +8,8 @@ from frappe.model.document import Document
 from frappe.model.naming import append_number_if_name_exists
 from frappe.utils import cint, sbool
 
-from erpnext.erp_integrations.pramaan import get_client
 from erpnext.erp_integrations.pramaan import banking as banking_contract
+from erpnext.erp_integrations.pramaan import get_client
 
 
 class BankingConnectionSettings(Document):

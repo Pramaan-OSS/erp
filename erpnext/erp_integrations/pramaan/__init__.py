@@ -3,9 +3,9 @@ from erpnext.pramaan import (
 	CapabilityUnavailable,
 	FeatureAvailability,
 	MissingPramaanKey,
+	PramaanClient,
 	PramaanError,
 	PramaanNotAvailable,
-	PramaanClient,
 )
 
 

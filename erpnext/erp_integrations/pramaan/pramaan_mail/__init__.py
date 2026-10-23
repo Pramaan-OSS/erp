@@ -8,6 +8,7 @@ from email.utils import getaddresses
 
 import frappe
 from frappe import _
+
 from erpnext.pramaan import PramaanClient, PramaanError
 
 
@@ -16,7 +17,7 @@ def client():
 
 
 def addresses(value):
-	values = value if isinstance(value, (list, tuple)) else [value or ""]
+	values = value if isinstance(value, list | tuple) else [value or ""]
 	return list(dict.fromkeys(address for _, address in getaddresses(values) if address))
 
 
@@ -168,6 +169,7 @@ def drain():
 def install_transport(**kwargs):
 	"""Framework invites and password mail must use the same transport."""
 	import frappe.email
+
 	from erpnext.erp_integrations.pramaan.configuration import install_local_boundaries
 	install_local_boundaries()
 	frappe.sendmail = sendmail

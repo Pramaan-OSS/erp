@@ -1,7 +1,8 @@
 """Bank transfers: durable approval, one request per bill, trusted settlement reads."""
 import time
 import uuid
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
+
 from erpnext.pramaan import PramaanError
 
 PREFIX = "payments.transfer-request."

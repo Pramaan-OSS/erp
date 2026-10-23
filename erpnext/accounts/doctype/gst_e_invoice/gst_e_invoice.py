@@ -5,8 +5,7 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 
-from erpnext.erp_integrations.pramaan import get_client
-from erpnext.erp_integrations.pramaan import india_gst
+from erpnext.erp_integrations.pramaan import get_client, india_gst
 from erpnext.pramaan import PramaanError
 
 

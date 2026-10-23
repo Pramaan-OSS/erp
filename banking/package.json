@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build --base=/assets/erpnext/banking/ && yarn copy-html-entry",
+    "build": "vite build --base=/assets/erpnext/banking/ && npm run copy-html-entry",
     "lint": "eslint .",
     "preview": "vite preview",
     "copy-html-entry": "cp ../erpnext/public/banking/index.html ../erpnext/www/banking.html"

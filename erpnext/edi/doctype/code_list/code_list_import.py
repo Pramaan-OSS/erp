@@ -1,4 +1,6 @@
 import json
+from urllib.parse import urlsplit
+
 import frappe
 from frappe import _
 from frappe.utils import escape_html
