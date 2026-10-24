@@ -21,6 +21,20 @@ optional features (bank feeds, route planning, text messages, payment links,
 address checks, shipping, company and tax lookups, document reading) stay off
 until the service offers them for your account.
 
+## Running on Postgres
+
+Postgres 16 is optional; MariaDB remains the default. With Docker Compose v2.20
+or newer, run:
+
+```sh
+ERP_DB=postgres ./start
+```
+
+This uses the separate `erp-pg` project and creates a fresh site. It does not
+convert an existing MariaDB database. Stop the other local stack before
+switching. See [POSTGRES.md](POSTGRES.md) for test results, limitations and
+commands for running checks with the fake client.
+
 ## What to expect
 
 - **Live today:** model calls, page reads, email sending, social sign-in.

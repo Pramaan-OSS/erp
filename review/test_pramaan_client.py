@@ -15,6 +15,53 @@ class ClientTests(unittest.TestCase):
         self.assertFalse(client.configured)
         self.assertEqual(calls, [])
 
+    def test_builtin_fake_payment_links_need_no_key_and_never_use_http(self):
+        with patch.dict(boundary.os.environ, {"PRAMAAN_FAKE": "1", "PRAMAAN_API_KEY": ""}), \
+                patch.object(boundary.PramaanClient, "_http", side_effect=AssertionError("Live calls forbidden")):
+            client = boundary.PramaanClient()
+            body = {"amount": 100, "currency": "GBP"}
+            self.assertTrue(client.estimate("payments.payment-link.create", body)["can_run"])
+            first = client.call("payments.payment-link.create", body, idempotency_key="fixture-link")
+            self.assertEqual(first, client.call("payments.payment-link.create", body, idempotency_key="fixture-link"))
+            self.assertTrue(first["paymentUrl"].startswith("http://localhost/fake-payments/"))
+            self.assertNotEqual(first["paymentLinkId"], client.call(
+                "payments.payment-link.create", body, idempotency_key="another-fixture")["paymentLinkId"])
+            self.assertEqual(client.call("payments.payment-link.orders.list", {
+                "paymentLinkId": first["paymentLinkId"], "status": "paid"}), {"items": []})
+            self.assertFalse(client.configured)
+
+    def test_builtin_fake_account_states_need_no_key_and_never_use_http(self):
+        with patch.object(boundary.PramaanClient, "_http", side_effect=AssertionError("Live calls forbidden")):
+            for state, expected in (("", None), ("incomplete", "pending"), ("ready", "ready")):
+                with self.subTest(state=state), patch.dict(boundary.os.environ, {
+                        "PRAMAAN_FAKE": "1", "PRAMAAN_API_KEY": "", "PRAMAAN_FAKE_ACCOUNT_STATE": state}):
+                    client = boundary.PramaanClient()
+                    if expected is None:
+                        with self.assertRaises(boundary.PramaanError) as raised:
+                            client.call("payments.account.status", {})
+                        self.assertEqual(raised.exception.code, "connection_required")
+                    else:
+                        self.assertEqual(client.call("payments.account.status", {})["status"], expected)
+                    self.assertTrue(client.estimate("payments.account.connect", {})["can_run"])
+
+    def test_fake_payment_links_do_not_enable_other_unconfigured_features(self):
+        with patch.dict(boundary.os.environ, {"PRAMAAN_FAKE": "1", "PRAMAAN_API_KEY": ""}):
+            client = boundary.PramaanClient()
+            with self.assertRaises(boundary.MissingPramaanKey):
+                client.require_configured()
+            with self.assertRaises(boundary.MissingPramaanKey):
+                client.call("finance.exchange-rate.get", {})
+            with self.assertRaises(boundary.MissingPramaanKey):
+                boundary.PramaanClient(transport=lambda *a: self.fail("Transport called")).call(
+                    "payments.payment-link.create", {"amount": 100}, idempotency_key="fixture-link")
+
+    def test_real_payment_links_still_require_a_key(self):
+        with patch.dict(boundary.os.environ, {"PRAMAAN_FAKE": "0", "PRAMAAN_API_KEY": ""}), \
+                patch.object(boundary.PramaanClient, "_http", side_effect=AssertionError("Live calls forbidden")):
+            with self.assertRaises(boundary.MissingPramaanKey):
+                boundary.PramaanClient().call("payments.payment-link.create", {
+                    "amount": 100, "currency": "GBP"}, idempotency_key="fixture-link")
+
     def test_payment_creates_always_send_the_configured_tax_category(self):
         for capability in ("payments.payment-link.create", "payments.checkout.create"):
             for configured, expected in ((None, "digital_products"), ("", "digital_products"),

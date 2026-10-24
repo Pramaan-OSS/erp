@@ -32,5 +32,8 @@ def configure(root, port=None):
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "--print-port":
         print(re.search(r"^ERP_LOCAL_PORT=(\d+)$", Path(".env").read_text(), re.M)[1])
+    elif len(sys.argv) > 1 and sys.argv[1] == "--print-db":
+        match = re.search(r"^ERP_DB=(.*)$", Path(".env").read_text(), re.M)
+        print(match[1].strip().strip("\"'") if match else "mariadb")
     else:
         configure(Path.cwd(), sys.argv[2] if len(sys.argv) > 2 and sys.argv[1] == "--port" else None)

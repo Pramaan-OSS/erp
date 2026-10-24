@@ -63,6 +63,9 @@ class PramaanError(RuntimeError):
 
 
 MISSING_KEY_MESSAGE = "Add PRAMAAN_API_KEY to .env"
+# Capabilities the built-in fixture (PRAMAAN_FAKE=1) answers without a key.
+FAKE_CAPABILITIES = {"payments.payment-link.create", "payments.payment-link.orders.list",
+                     "payments.account.status", "payments.account.connect"}
 
 
 class MissingPramaanKey(PramaanError):
@@ -174,7 +177,8 @@ class PramaanClient:
             raise PramaanError("invalid_configuration")
         if parsed.username or parsed.password or parsed.query or parsed.fragment:
             raise PramaanError("invalid_configuration")
-        self._transport = transport or (self._fake if os.environ.get("PRAMAAN_FAKE") == "1" else self._http)
+        self._uses_fake_transport = transport is None and os.environ.get("PRAMAAN_FAKE") == "1"
+        self._transport = transport if transport is not None else (self._fake if self._uses_fake_transport else self._http)
         self._sleep = sleep
         self.last_charge_micro = None
         self.last_job_id = None
@@ -188,9 +192,35 @@ class PramaanClient:
         if not self.configured:
             raise MissingPramaanKey()
 
+    def _require_call_configuration(self, capability):
+        # Only the built-in payment-link fixtures may run with an empty key.
+        # Keep require_configured strict for package clients and other features.
+        if self._uses_fake_transport and capability in FAKE_CAPABILITIES:
+            return
+        self.require_configured()
+
     @staticmethod
     def _fake(method, url, headers, body):
         # Explicit local fixture mode has no network transport or outside effects.
+        path = urlparse(url).path
+        if method == "POST" and path.endswith("/v1/capabilities/payments.payment-link.create/estimate"):
+            return 200, {"can_run": True}
+        if method == "POST" and path.endswith("/v1/capabilities/payments.payment-link.create"):
+            reference = "fake-link-" + uuid.uuid5(uuid.NAMESPACE_URL, headers["Idempotency-Key"]).hex
+            return 200, {"paymentLinkId": reference, "paymentUrl": "http://localhost/fake-payments/" + reference}
+        if method == "POST" and path.endswith("/v1/capabilities/payments.payment-link.orders.list"):
+            # A fake link never claims money has arrived automatically.
+            return 200, {"items": []}
+        if method == "POST" and path.endswith("/v1/capabilities/payments.account.connect/estimate"):
+            return 200, {"can_run": True}
+        if method == "POST" and path.endswith("/v1/capabilities/payments.account.status"):
+            # PRAMAAN_FAKE_ACCOUNT_STATE picks the fixture: not_connected (default), incomplete or ready.
+            state = os.environ.get("PRAMAAN_FAKE_ACCOUNT_STATE", "not_connected")
+            if state not in {"incomplete", "ready"}:
+                return 409, {"error": {"code": "connection_required", "retryable": False}}
+            ready = state == "ready"
+            return 200, {"status": "ready" if ready else "pending", "chargesEnabled": ready, "payoutsEnabled": ready,
+                         "requirementsDue": [] if ready else ["external_account", "company.tax_id"]}
         return 503, {"error": {"code": "upstream_unavailable", "retryable": False}}
 
     def _http(self, method, url, headers, body):
@@ -223,7 +253,7 @@ class PramaanClient:
             raise PramaanError("unavailable", uncertain=method == "POST") from None
 
     def _request(self, method, path, body=None, *, idempotency_key=None, approved_by=None, account=None, plan=None, outcome=False, capability=None, max_price_micro=None):
-        self.require_configured()
+        self._require_call_configuration(capability)
         headers = {"Authorization": "Bearer " + self._api_key, "Accept": "application/json"}
         if body is not None:
             headers["Content-Type"] = "application/json"
@@ -269,7 +299,7 @@ class PramaanClient:
         return status, result
 
     def run(self, capability, inputs, *, idempotency_key=None, approved_by=None, max_price_micro=None):
-        self.require_configured()
+        self._require_call_configuration(capability)
         if capability not in self.CAPABILITIES:
             raise PramaanError("unsupported_capability")
         if capability in self.ACTIONS and not idempotency_key:
@@ -290,7 +320,7 @@ class PramaanClient:
         if capability in {"payments.payment-link.create", "payments.checkout.create"}:
             inputs = {**inputs, "taxCategory": payment_tax_category()}
         try:
-            _, result = self._request("POST", "/v1/capabilities/" + quote(capability, safe="") + "/estimate", inputs)
+            _, result = self._request("POST", "/v1/capabilities/" + quote(capability, safe="") + "/estimate", inputs, capability=capability)
         except PramaanError as error:
             if error.uncertain:
                 # Estimates never perform an action, even if their reply is lost.

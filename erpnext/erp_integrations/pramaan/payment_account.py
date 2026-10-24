@@ -45,7 +45,8 @@ def _admin():
 
 def _client():
     client = get_client()
-    client.require_configured()
+    if not client._uses_fake_transport:
+        client.require_configured()
     return client
 
 
@@ -120,6 +121,9 @@ def connect(confirmation: str | None = None, country: str = ""):
 def create_account_session():
     """Create a fresh package session using the deployment's configured identity."""
     client = _client()
+    if client._uses_fake_transport:
+        # The fixture has no embedded components; never reach the network.
+        raise PramaanError("unavailable")
     try:
         with Pramaan(client._api_key, base_url=client._base_url) as sdk:
             result = payments_account_session(sdk, components=COMPONENTS)

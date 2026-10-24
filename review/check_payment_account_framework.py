@@ -1,9 +1,14 @@
 """Run in a disposable PRAMAAN_FAKE=1 stack; no external calls are permitted."""
 import os
 from unittest.mock import patch
+from contextlib import nullcontext
+from pramaan.testing import fake_payments_account
 if os.environ.get('PRAMAAN_FAKE') != '1':
     raise SystemExit('Use a disposable fake-only stack.')
-os.chdir('/app/.runtime/bench/sites')
+from pathlib import Path
+root = Path(os.environ.get('ERP_APP_ROOT', '/app'))
+os.environ.setdefault('ERP_ADMIN_PASSWORD', (root / '.runtime/local-admin-password').read_text().strip() if (root / '.runtime/local-admin-password').exists() else '')
+os.chdir(root / '.runtime/bench/sites')
 import frappe
 from erpnext.pramaan import PramaanClient
 from erpnext.erp_integrations.pramaan import payment_account as account
@@ -28,13 +33,17 @@ def transport(method,url,headers,body):
     return 200, {'status':'ready' if state=='ready' else 'pending','chargesEnabled':state=='ready',
         'payoutsEnabled':state=='ready','requirementsDue':['external_account','company.tax_id']}
 client=PramaanClient(api_key='fixture-only',transport=transport)
+sdk=fake_payments_account(state='ready')
 web=Client(application,Response); base='http://'+site
 prefix='/api/method/'+account.__name__+'.'
 def invoke(method,**data):
     r=web.post(prefix+method,base_url=base,data=data)
     assert r.status_code==200,(method,r.status_code,r.get_data(as_text=True))
     return r
-with patch.object(account,'get_client',return_value=client), patch.object(PramaanClient,'_http',side_effect=AssertionError('Live calls forbidden')):
+with patch.object(account,'get_client',return_value=client), \
+        patch.object(account,'Pramaan',side_effect=lambda *a, **kw: nullcontext(sdk)), \
+        patch('httpx.Client.send',side_effect=AssertionError('Live calls forbidden')), \
+        patch.object(PramaanClient,'_http',side_effect=AssertionError('Live calls forbidden')):
     r=web.post(prefix+'session',base_url=base)
     assert r.status_code in {401,403} and r.headers.get('Cache-Control')=='no-store'
     assert not calls
@@ -48,13 +57,14 @@ with patch.object(account,'get_client',return_value=client), patch.object(Pramaa
     assert set(first.get_json()['message'])=={'clientSecret','publishableKey'}
     assert first.headers.get('Cache-Control')=='no-store'
     invoke('session')
-    keys=[headers['Idempotency-Key'] for url,headers,_ in calls if url.endswith('.session.create')]
+    session_calls=[call for call in sdk.calls if call[0]=='payments.account.session.create']
+    keys=[call[2].idempotency_key for call in session_calls]
     assert len(set(keys))==2
-    assert calls[-1][2]=={'components':account.COMPONENTS}
+    assert session_calls[-1][1]['components']==account.COMPONENTS
     web.post('/api/method/logout',base_url=base)
     web.post('/api/method/login',base_url=base,data={'usr':'account-viewer@erp.test','pwd':'fixture-local-only'})
-    count=len(calls)
+    count=(len(calls),len(sdk.calls))
     for method in ['status','connect','session']:
         assert web.post(prefix+method,base_url=base).status_code==403
-    assert count==len(calls)
+    assert count==(len(calls),len(sdk.calls))
 print('PASS: real HTTP authorization, all account states, connect approval, filtered session reply, no-store and fresh session keys; fake transport only.')
