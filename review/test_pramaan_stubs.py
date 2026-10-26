@@ -42,7 +42,7 @@ class ContractTests(unittest.TestCase):
             "geo.address.validate", "geo.address.parse", "geo.address.geocode",
             "shipping.label.purchase", "shipping.container.track", "shipping.delivery.estimate",
             "companies.enrich", "companies.domain.find", "companies.tax-identifiers.list",
-            "document.extract",
+            "document.extract", "edi.einvoice.submit", "edi.einvoice.status.get",
             "india.gst.consent.create", "india.gst.einvoice.create", "india.gst.einvoice.get",
             "india.gst.einvoice.cancel", "india.gst.einvoice.qr.get",
         }

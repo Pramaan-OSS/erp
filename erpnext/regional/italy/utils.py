@@ -346,6 +346,8 @@ def sales_invoice_on_submit(doc, method):
 
 
 def prepare_and_attach_invoice(doc, replace=False):
+	from erpnext.erp_integrations.pramaan.italy_einvoice import protect_xml
+	protect_xml(doc.name)
 	progressive_name, progressive_number = get_progressive_name_and_number(doc, replace)
 
 	invoice = prepare_invoice(doc, progressive_number)
@@ -386,6 +388,8 @@ def generate_single_invoice(docname: str):
 
 # Delete e-invoice attachment on cancel.
 def sales_invoice_on_cancel(doc, method):
+	from erpnext.erp_integrations.pramaan.italy_einvoice import protect_xml
+	protect_xml(doc.name)
 	if doc.is_opening == "Yes" or get_company_country(doc.company) not in [
 		"Italy",
 		"Italia",

@@ -123,5 +123,7 @@ jobs:
       - run: ./review/prepare-local
       - run: .venv/bin/python review/prepare-postgres.py
       - run: .venv/bin/python review/check_payment_account_framework.py
+      - run: .venv/bin/python review/check_italy_einvoice_framework.py
+      - run: .venv/bin/python review/check_italy_einvoice_http.py
       - run: .venv/bin/python -m unittest discover -s review
       - run: node --test "erpnext/tests/js/**/*.test.mjs"

@@ -154,7 +154,8 @@
   "default_wip_warehouse",
   "default_fg_warehouse",
   "default_scrap_warehouse",
-  "dashboard_tab"
+  "dashboard_tab",
+  "italy_invoicing_connection"
  ],
  "fields": [
   {
@@ -1152,6 +1153,14 @@
   {
    "fieldname": "column_break_gthb",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "italy_invoicing_connection",
+   "fieldtype": "Small Text",
+   "label": "Italian invoicing account",
+   "hidden": 1,
+   "read_only": 1,
+   "permlevel": 1
   }
  ],
  "grid_page_length": 50,

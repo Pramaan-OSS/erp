@@ -65,7 +65,8 @@ class PramaanError(RuntimeError):
 MISSING_KEY_MESSAGE = "Add PRAMAAN_API_KEY to .env"
 # Capabilities the built-in fixture (PRAMAAN_FAKE=1) answers without a key.
 FAKE_CAPABILITIES = {"payments.payment-link.create", "payments.payment-link.orders.list",
-                     "payments.account.status", "payments.account.connect"}
+                     "payments.account.status", "payments.account.connect",
+                     "edi.einvoice.submit", "edi.einvoice.status.get"}
 
 
 class MissingPramaanKey(PramaanError):
@@ -85,7 +86,7 @@ class PramaanNotAvailable(PramaanError):
             ("banking.", "Bank feeds"), ("routes.", "Route planning"), ("sms.", "Text messages"),
             ("payments.", "Payments"), ("geo.", "Address checks"), ("shipping.", "Shipping"),
             ("companies.", "Company details"), ("finance.", "Tax and currency data"),
-            ("india.", "India e-invoicing"),
+            ("india.", "India e-invoicing"), ("edi.", "Italian e-invoicing"),
             ("document.", "Document reading"), ("email.", "Email"), ("auth.", "Social sign-in"),
         ):
             if capability.startswith(prefix):
@@ -152,6 +153,7 @@ class PramaanClient:
         "shipping.label.purchase", "shipping.container.track", "shipping.delivery.estimate",
         "companies.enrich", "companies.domain.find", "companies.tax-identifiers.list",
         "document.extract",
+        "edi.einvoice.submit", "edi.einvoice.status.get",
         "india.gst.consent.create",
         "india.gst.einvoice.create", "india.gst.einvoice.get",
         "india.gst.einvoice.cancel", "india.gst.einvoice.qr.get",
@@ -163,7 +165,7 @@ class PramaanClient:
         "payments.payment-link.create", "payments.checkout.create",
         "email.send", "email.template.send", "email.message.send", "email.message.reply",
         "banking.connection.start", "banking.transactions.sync", "auth.social.exchange", "shipping.label.purchase",
-        "india.gst.consent.create", "india.gst.einvoice.create", "india.gst.einvoice.cancel",
+        "india.gst.consent.create", "india.gst.einvoice.create", "india.gst.einvoice.cancel", "edi.einvoice.submit",
     })
     OUTCOMES = frozenset({"invoice.process", "tax.quote", "payments.reconcile"})
 
@@ -193,7 +195,7 @@ class PramaanClient:
             raise MissingPramaanKey()
 
     def _require_call_configuration(self, capability):
-        # Only the built-in payment-link fixtures may run with an empty key.
+        # Only explicitly listed built-in fixtures may run with an empty key.
         # Keep require_configured strict for package clients and other features.
         if self._uses_fake_transport and capability in FAKE_CAPABILITIES:
             return
@@ -203,6 +205,10 @@ class PramaanClient:
     def _fake(method, url, headers, body):
         # Explicit local fixture mode has no network transport or outside effects.
         path = urlparse(url).path
+        from erpnext.erp_integrations.pramaan.italy_invoice import fake_response
+        answer = fake_response(path, headers, body)
+        if answer is not None:
+            return answer
         if method == "POST" and path.endswith("/v1/capabilities/payments.payment-link.create/estimate"):
             return 200, {"can_run": True}
         if method == "POST" and path.endswith("/v1/capabilities/payments.payment-link.create"):
@@ -237,18 +243,20 @@ class PramaanClient:
             self.last_charge_micro = error.headers.get("X-Pramaan-Price-Micro")
             # Read only bounded, recognized error codes; never surface the upstream body.
             code = None
+            effect_none = False
             try:
                 payload = json.loads(error.read(16_001))
                 inner = payload.get("error") if isinstance(payload, dict) else None
                 if isinstance(inner, dict):
                     code = inner.get("code")
+                    effect_none = inner.get("effect") == "none"
                 elif isinstance(inner, str):
                     code = inner
                 elif isinstance(payload, dict):
                     code = payload.get("code")
             except (ValueError, OSError):
                 code = None
-            return error.code, {"error": code if isinstance(code, str) and code in UNAVAILABLE_CODES | {"connection_required", "forbidden", "approval_required"} else None}
+            return error.code, {"error": {"code": code if isinstance(code, str) and code in UNAVAILABLE_CODES | {"connection_required", "forbidden", "approval_required"} else None, **({"effect": "none"} if effect_none else {})}}
         except (URLError, OSError, ValueError):
             raise PramaanError("unavailable", uncertain=method == "POST") from None
 
@@ -281,9 +289,15 @@ class PramaanClient:
                 remote_code = remote_code.get("code")
             if not remote_code and isinstance(result, dict):
                 remote_code = result.get("code")
+            if capability == "edi.einvoice.submit":
+                no_effect = isinstance(result, dict) and isinstance(result.get("error"), dict) and result["error"].get("effect") == "none"
+                if no_effect:
+                    raise PramaanError("request_rejected")
+                if status >= 500 and not (status == 501 and remote_code in {"not_available_yet", "not_available"}):
+                    raise PramaanError("unavailable", uncertain=True)
             if remote_code == "connection_required":
                 error = PramaanError("connection_required")
-                error.args = ("Connect your payments account first, then try again.",)
+                error.args = (("Connect your invoicing account first, then try again." if capability and capability.startswith("edi.") else "Connect your payments account first, then try again."),)
                 raise error
             if capability and (status == 501 or isinstance(remote_code, str) and remote_code in UNAVAILABLE_CODES):
                 raise PramaanNotAvailable(capability)
@@ -298,7 +312,7 @@ class PramaanClient:
             raise PramaanError("invalid_response", uncertain=method == "POST")
         return status, result
 
-    def run(self, capability, inputs, *, idempotency_key=None, approved_by=None, max_price_micro=None):
+    def run(self, capability, inputs, *, idempotency_key=None, approved_by=None, max_price_micro=None, account=None):
         self._require_call_configuration(capability)
         if capability not in self.CAPABILITIES:
             raise PramaanError("unsupported_capability")
@@ -307,20 +321,20 @@ class PramaanClient:
         if capability in {"payments.payment-link.create", "payments.checkout.create"}:
             inputs = {**inputs, "taxCategory": payment_tax_category()}
         status, result = self._request("POST", "/v1/capabilities/" + quote(capability, safe=""), inputs,
-                                       idempotency_key=idempotency_key, approved_by=approved_by, capability=capability, max_price_micro=max_price_micro)
+                                       idempotency_key=idempotency_key, approved_by=approved_by, capability=capability, max_price_micro=max_price_micro, account=account)
         if status == 202:
             if not isinstance(result.get("job_id"), str) or result.get("status") not in {"running", "done", "failed", "cancelled"}:
                 raise PramaanError("invalid_response", uncertain=capability in self.ACTIONS)
         return result
 
-    def estimate(self, capability, inputs):
+    def estimate(self, capability, inputs, *, account=None):
         """Estimate the exact capability body without running it."""
         if capability not in self.CAPABILITIES:
             raise PramaanError("unsupported_capability")
         if capability in {"payments.payment-link.create", "payments.checkout.create"}:
             inputs = {**inputs, "taxCategory": payment_tax_category()}
         try:
-            _, result = self._request("POST", "/v1/capabilities/" + quote(capability, safe="") + "/estimate", inputs, capability=capability)
+            _, result = self._request("POST", "/v1/capabilities/" + quote(capability, safe="") + "/estimate", inputs, capability=capability, account=account)
         except PramaanError as error:
             if error.uncertain:
                 # Estimates never perform an action, even if their reply is lost.
@@ -344,10 +358,10 @@ class PramaanClient:
             self.last_job_charge_micro = charged
         return result
 
-    def call(self, capability, inputs, *, idempotency_key=None, approved_by=None, max_polls=60, max_price_micro=None):
+    def call(self, capability, inputs, *, idempotency_key=None, approved_by=None, max_polls=60, max_price_micro=None, account=None):
         self.last_job_id = None
         self.last_job_charge_micro = None
-        result = self.run(capability, inputs, idempotency_key=idempotency_key, approved_by=approved_by, max_price_micro=max_price_micro)
+        result = self.run(capability, inputs, idempotency_key=idempotency_key, approved_by=approved_by, max_price_micro=max_price_micro, account=account)
         if "job_id" not in result:
             return result
         job_id = result["job_id"]

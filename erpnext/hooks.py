@@ -62,6 +62,7 @@ web_include_icons = [
 ]
 
 doctype_js = {
+	"Company": "public/js/italy_einvoice_company.js",
 	"Address": "public/js/address.js",
 	"Customer": ["public/js/party_overview.js", "public/js/customer_overview.js"],
 	"Supplier": ["public/js/party_overview.js", "public/js/supplier_overview.js"],
@@ -400,7 +401,8 @@ doc_events = {
 		],
 	},
 	"File": {
-		"validate": "erpnext.erp_integrations.pramaan.configuration.require_local_file",
+		"validate": ["erpnext.erp_integrations.pramaan.configuration.require_local_file", "erpnext.erp_integrations.pramaan.italy_einvoice.protect_file"],
+		"on_trash": "erpnext.erp_integrations.pramaan.italy_einvoice.protect_file",
 	},
 	"System Settings": {
 		"validate": "erpnext.erp_integrations.pramaan.configuration.disable_telemetry",
@@ -454,6 +456,7 @@ doc_events = {
 		"on_trash": "erpnext.regional.check_deletion_permission",
 	},
 	"Company": {
+		"validate": "erpnext.erp_integrations.pramaan.italy_einvoice.protect_connection",
 		"after_rename": "erpnext.regional.rename_vat_settings",
 	},
 	"Address": {

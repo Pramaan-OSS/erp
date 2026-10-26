@@ -1,0 +1,112 @@
+{
+  "doctype": "DocType",
+  "name": "Italy Invoice Submission",
+  "module": "ERP Integrations",
+  "autoname": "hash",
+  "field_order": [
+    "invoice",
+    "company",
+    "reservation",
+    "account",
+    "document_identity",
+    "payload",
+    "idempotency_key",
+    "approved_by",
+    "state",
+    "result_ref",
+    "receipt",
+    "last_checked_at"
+  ],
+  "fields": [
+    {
+      "fieldname": "invoice",
+      "label": "Invoice",
+      "fieldtype": "Link",
+      "read_only": 1,
+      "options": "Sales Invoice"
+    },
+    {
+      "fieldname": "company",
+      "label": "Company",
+      "fieldtype": "Link",
+      "read_only": 1,
+      "options": "Company"
+    },
+    {
+      "fieldname": "reservation",
+      "label": "Reservation",
+      "fieldtype": "Data",
+      "read_only": 1,
+      "unique": 1,
+      "hidden": 1
+    },
+    {
+      "fieldname": "account",
+      "label": "Account",
+      "fieldtype": "Small Text",
+      "read_only": 1,
+      "hidden": 1
+    },
+    {
+      "fieldname": "document_identity",
+      "label": "Document Identity",
+      "fieldtype": "Data",
+      "read_only": 1,
+      "hidden": 1
+    },
+    {
+      "fieldname": "payload",
+      "label": "Payload",
+      "fieldtype": "Code",
+      "read_only": 1,
+      "hidden": 1,
+      "options": "JSON"
+    },
+    {
+      "fieldname": "idempotency_key",
+      "label": "Idempotency Key",
+      "fieldtype": "Data",
+      "read_only": 1,
+      "hidden": 1
+    },
+    {
+      "fieldname": "approved_by",
+      "label": "Approved By",
+      "fieldtype": "Link",
+      "read_only": 1,
+      "options": "User"
+    },
+    {
+      "fieldname": "state",
+      "label": "State",
+      "fieldtype": "Select",
+      "read_only": 1,
+      "options": "Sending\nPending\nAccepted\nRejected\nRefused\nUncertain"
+    },
+    {
+      "fieldname": "result_ref",
+      "label": "Result Ref",
+      "fieldtype": "Small Text",
+      "read_only": 1,
+      "hidden": 1
+    },
+    {
+      "fieldname": "receipt",
+      "label": "Receipt",
+      "fieldtype": "Data",
+      "read_only": 1
+    },
+    {
+      "fieldname": "last_checked_at",
+      "label": "Last Checked At",
+      "fieldtype": "Data",
+      "read_only": 1
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1
+    }
+  ]
+}
