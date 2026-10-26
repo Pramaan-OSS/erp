@@ -20,6 +20,8 @@ from erpnext.pramaan import PramaanClient
 frappe.init(site=os.environ['ERP_SITE_NAME']); frappe.connect(); frappe.set_user('Administrator')
 name, company = seed()
 frappe.destroy()
+env_file = dict(line.split('=', 1) for line in (root / '.env').read_text().splitlines() if '=' in line and not line.startswith('#'))
+admin_password = os.environ.get('ERP_ADMIN_PASSWORD') or env_file['ERP_ADMIN_PASSWORD']
 web = Client(application, Response)
 base = 'http://' + os.environ['ERP_SITE_NAME']
 prefix = '/api/method/erpnext.erp_integrations.pramaan.italy_einvoice.'
@@ -30,7 +32,7 @@ def post(method, **values):
 with patch.object(PramaanClient, '_http', side_effect=AssertionError('Live calls forbidden')):
     for method, data in [('action', {'docname': name}), ('configure', {'company': company, 'connection': 'conn_Example'})]:
         assert web.post(prefix + method, base_url=base, data=data).status_code in {401, 403}
-    assert web.post('/api/method/login', base_url=base, data={'usr': 'Administrator', 'pwd': os.environ['ERP_ADMIN_PASSWORD']}).status_code == 200
+    assert web.post('/api/method/login', base_url=base, data={'usr': 'Administrator', 'pwd': admin_password}).status_code == 200
     assert post('configure', company=company, connection='conn_Example')['configured']
     preview = post('action', docname=name, operation='prepare')
     assert preview['state'] == 'Confirm'
